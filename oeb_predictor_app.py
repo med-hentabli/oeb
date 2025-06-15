@@ -361,20 +361,20 @@ def main():
                     padded_probs[:len(probs)] = probs
                     if np.sum(padded_probs) > 0 : padded_probs = padded_probs / np.sum(padded_probs)
                     else: padded_probs = np.full(len(OEB_DESCRIPTIONS), 1/len(OEB_DESCRIPTIONS) if len(OEB_DESCRIPTIONS) > 0 else 1.0)
-                        prob_df_data = {"OEB Class": list(OEB_DESCRIPTIONS.keys()), 
-                                            "Description": [val.split(':')[1].split('(')[0].strip() for val in OEB_DESCRIPTIONS.values()],
-                                            "Probability": padded_probs}
+                        prob_df_data = {"OEB Class": list(OEB_DESCRIPTIONS.keys()),
+                                        "Description": [val.split(':')[1].split('(')[0].strip() for val in OEB_DESCRIPTIONS.values()],
+                                        "Probability": padded_probs}
                 else: # Should not happen if previous check failed, but as a safe guard
                     prob_df_data = {"OEB Class": list(OEB_DESCRIPTIONS.keys()), 
-                                            "Description": [val.split(':')[1].split('(')[0].strip() for val in OEB_DESCRIPTIONS.values()],
-                                            "Probability": probs}
+                                    "Description": [val.split(':')[1].split('(')[0].strip() for val in OEB_DESCRIPTIONS.values()],
+                                    "Probability": probs}
 
             else: # Lengths match
                 prob_df_data = {
-                            "OEB Class": list(OEB_DESCRIPTIONS.keys()),
-                            "Description": [val.split(':')[1].split('(')[0].strip() for val in OEB_DESCRIPTIONS.values()],
-                            "Probability": probs
-                        }
+                    "OEB Class": list(OEB_DESCRIPTIONS.keys()),
+                    "Description": [val.split(':')[1].split('(')[0].strip() for val in OEB_DESCRIPTIONS.values()],
+                    "Probability": probs
+                }
                     
                 prob_df = pd.DataFrame(prob_df_data).set_index("OEB Class")
                 st.dataframe(prob_df.style.format({"Probability": "{:.2%}"}).bar(subset=["Probability"], color='lightgreen', vmin=0, vmax=1), use_container_width=True)
