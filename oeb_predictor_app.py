@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-OEB Prediction Pro - Updated for TensorFlow SavedModel format
+OEB Prediction Pro - Complete UI Version
 """
 
 import numpy as np
@@ -68,7 +68,6 @@ def load_models_and_scalers():
         try:
             imported = tf.saved_model.load(get_model_path(CNN_MODEL_NAME))
             cnn_model = imported.signatures["serving_default"]
-            st.success("Successfully loaded CNN model in SavedModel format")
         except Exception as e:
             st.error(f"Failed to load CNN model: {str(e)}")
             return None, {}, {}
@@ -126,7 +125,7 @@ def compute_cnn_ready_features(smiles, scalers, cnn_model):
         # Get predictions from SavedModel
         output = cnn_model(input_tensor)
         
-        # Extract features from output dictionary (adjust key if needed)
+        # Extract features from output dictionary
         features = output['output_0'].numpy() if 'output_0' in output else list(output.values())[0].numpy()
         
         # Scale features
@@ -138,28 +137,182 @@ def compute_cnn_ready_features(smiles, scalers, cnn_model):
         st.error(f"Error in feature computation: {e}")
         return None
 
-# ... [rest of your existing functions remain unchanged until main()] ...
+@st.cache_data(ttl=3600)
+def get_pubchem_data(compound_name):
+    """Fetches compound CID and SMILES from PubChem."""
+    if not compound_name:
+        return None, None
+    try:
+        encoded_name = quote(compound_name)
+        cid_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{encoded_name}/cids/JSON"
+        res_cid = requests.get(cid_url, timeout=10)
+        res_cid.raise_for_status()
+        cid = res_cid.json().get("IdentifierList", {}).get("CID", [None])[0]
+
+        if cid:
+            smiles_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/property/CanonicalSMILES/JSON"
+            res_smiles = requests.get(smiles_url, timeout=10)
+            res_smiles.raise_for_status()
+            smiles = res_smiles.json().get("PropertyTable", {}).get("Properties", [{}])[0].get("CanonicalSMILES")
+            pubchem_page_url = f"https://pubchem.ncbi.nlm.nih.gov/compound/{cid}"
+            return pubchem_page_url, smiles
+    except requests.exceptions.RequestException as e:
+        st.warning(f"PubChem API request failed: {e}")
+    except Exception as e:
+        st.warning(f"Error processing PubChem data for '{compound_name}': {e}")
+    return None, None
+
+def normalize_probabilities(probs, target_length):
+    """Normalizes probabilities to match target length."""
+    if len(probs) == target_length:
+        return probs
+    
+    normalized = np.zeros(target_length)
+    common_len = min(len(probs), target_length)
+    normalized[:common_len] = probs[:common_len]
+    
+    if np.sum(normalized) > 0:
+        normalized = normalized / np.sum(normalized)
+    else:
+        normalized = np.full(target_length, 1/target_length if target_length > 0 else 1.0)
+    
+    return normalized
 
 def main():
     st.title("🔬 OEB Prediction Pro")
     st.markdown("Predict Occupational Exposure Bands for chemical compounds using advanced machine learning models.")
 
-    # Display TensorFlow version for debugging
-    st.sidebar.markdown(f"**TensorFlow Version:** {tf.__version__}")
-    
+    # Initialize session state
+    if 'smiles_input' not in st.session_state:
+        st.session_state.smiles_input = DEFAULT_SMILES
+
+    # Load models
     cnn_model, scalers, classifiers = load_models_and_scalers()
 
     if cnn_model is None or not scalers or not classifiers:
-        st.error("""
-        Application cannot start due to model loading errors. Please check:
-        1. All model files are in the 'models' directory
-        2. The CNN model is in SavedModel format in directory: cnn_model_tf213_compatiblev2
-        3. File permissions are correct
-        """)
-        st.markdown(f"Expected model directory: `{os.path.join(os.path.dirname(os.path.abspath(__file__)), MODEL_DIR)}`")
+        st.error("Application cannot start due to model loading errors.")
         return
 
-    # ... [rest of your existing main() function remains unchanged] ...
+    # Sidebar controls
+    st.sidebar.header("⚙️ Controls")
+    selected_model_name = st.sidebar.selectbox("Select Model", MODEL_NAMES, index=0)
+    
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("OEB Reference Guide")
+    for oeb_val, desc in OEB_DESCRIPTIONS.items():
+        st.sidebar.markdown(f"**OEB {oeb_val}:** {desc.split(':')[1].split('(')[0].strip()}")
+    
+    st.sidebar.markdown("---")
+    st.sidebar.info("Note: This tool provides predictions based on machine learning models. Always verify results with experimental data.")
+
+    # Main content area
+    col1, col2 = st.columns([1, 1])
+
+    with col1:
+        st.subheader("Compound Input")
+        
+        # PubChem search
+        st.markdown("**Search PubChem by Name**")
+        pubchem_name = st.text_input("Enter compound name (e.g., Aspirin)", key="pubchem_search")
+        
+        if pubchem_name:
+            with st.spinner(f"Searching PubChem for '{pubchem_name}'..."):
+                pubchem_url, retrieved_smiles = get_pubchem_data(pubchem_name)
+            
+            if retrieved_smiles:
+                st.success(f"Found: {pubchem_name}")
+                st.info(f"SMILES: {retrieved_smiles}")
+                if st.button(f"Use this compound", key="use_pubchem"):
+                    st.session_state.smiles_input = retrieved_smiles
+            elif pubchem_name:
+                st.warning("Compound not found in PubChem")
+
+        # Direct SMILES input
+        st.markdown("**Or enter SMILES directly**")
+        smiles = st.text_input("SMILES string", 
+                             value=st.session_state.smiles_input,
+                             key="smiles_input",
+                             help="Enter the SMILES notation of your compound")
+        
+        # Example/clear buttons
+        col_ex, col_clr = st.columns(2)
+        with col_ex:
+            if st.button("Load Example (Aspirin)"):
+                st.session_state.smiles_input = DEFAULT_SMILES
+                st.rerun()
+        with col_clr:
+            if st.button("Clear Input"):
+                st.session_state.smiles_input = ""
+                st.rerun()
+
+        # Prediction button
+        if st.button("🚀 Predict OEB", type="primary", use_container_width=True):
+            if not st.session_state.smiles_input:
+                st.error("Please enter a SMILES string or search PubChem")
+            else:
+                with st.spinner("Calculating OEB prediction..."):
+                    features = compute_cnn_ready_features(st.session_state.smiles_input, scalers, cnn_model)
+                
+                if features is None:
+                    st.error("Invalid SMILES or error in calculation")
+                else:
+                    model = classifiers[selected_model_name]
+                    
+                    # Get probabilities
+                    if hasattr(model, "predict_proba"):
+                        probs = model.predict_proba(features)[0]
+                    else: 
+                        decision_scores = model.decision_function(features)
+                        if decision_scores.ndim == 1:
+                            probs = softmax(np.array([decision_scores.squeeze()]), axis=1)[0]
+                        else:
+                            probs = softmax(decision_scores, axis=1)[0]
+                    
+                    probs = normalize_probabilities(probs, len(OEB_DESCRIPTIONS))
+                    pred_class = int(np.argmax(probs))
+
+                    # Display results
+                    st.success(f"Predicted OEB: **{pred_class}**")
+                    st.markdown(f"**{OEB_DESCRIPTIONS.get(pred_class, 'Unknown')}**")
+                    
+                    # Probability distribution
+                    st.subheader("Probability Distribution")
+                    prob_df = pd.DataFrame({
+                        "OEB": list(OEB_DESCRIPTIONS.keys()),
+                        "Description": [d.split(":")[0] for d in OEB_DESCRIPTIONS.values()],
+                        "Probability": probs
+                    }).set_index("OEB")
+                    
+                    st.dataframe(
+                        prob_df.style.format({"Probability": "{:.2%}"})
+                              .bar(subset=["Probability"], color='#5fba7d'),
+                        use_container_width=True
+                    )
+
+    with col2:
+        st.subheader("Molecule Information")
+        
+        if st.session_state.smiles_input:
+            st.code(st.session_state.smiles_input, language="text")
+            
+            # Basic molecule properties
+            mol = Chem.MolFromSmiles(st.session_state.smiles_input)
+            if mol:
+                st.markdown("**Molecular Properties**")
+                col_mw, col_fp = st.columns(2)
+                with col_mw:
+                    st.metric("Molecular Weight", f"{Descriptors.MolWt(mol):.2f}")
+                with col_fp:
+                    fp = AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=1024)
+                    st.metric("Fingerprint Bits", f"{len(fp.GetOnBits())}")
+                
+                # Display PubChem link if available
+                if pubchem_name and pubchem_url:
+                    st.markdown(f"[View on PubChem ↗]({pubchem_url})", unsafe_allow_html=True)
+            else:
+                st.warning("Invalid SMILES - cannot compute properties")
+        else:
+            st.info("Enter a SMILES string or search PubChem to see molecular information")
 
 if __name__ == "__main__":
     if not DESC_NAMES and hasattr(Descriptors, '_descList'): 
@@ -168,5 +321,5 @@ if __name__ == "__main__":
         except Exception:
             pass 
     if not DESC_NAMES:
-        st.error("Critical Error: RDKit descriptor names (DESC_NAMES) could not be initialized.")
+        st.error("Critical Error: RDKit descriptor names could not be initialized.")
     main()
