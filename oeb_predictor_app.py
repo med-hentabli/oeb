@@ -314,30 +314,30 @@ def main():
                                          probs = correct_len_probs / np.sum(correct_len_probs) # Re-normalize
                                      else:
                                          probs = softmax(decision_scores_2d, axis=1)[0]
-                                elif decision_scores.ndim == 2: # Expected case: (n_samples, n_classes), e.g. (1, 7)
-                                    if decision_scores.shape[1] != len(OEB_DESCRIPTIONS):
-                                        st.error(f"2D decision scores shape ({decision_scores.shape}) mismatch with OEB classes ({len(OEB_DESCRIPTIONS)}). Cannot compute probabilities reliably.")
-                                        probs = np.full(len(OEB_DESCRIPTIONS), 1/len(OEB_DESCRIPTIONS) if len(OEB_DESCRIPTIONS) > 0 else 1.0)
-                                    else:
-                                        probs = softmax(decision_scores, axis=1)[0]
-                                else:
-                                    st.error(f"Decision scores dimensionality ({decision_scores.ndim}) not supported. Expected 1D or 2D.")
+                            elif decision_scores.ndim == 2: # Expected case: (n_samples, n_classes), e.g. (1, 7)
+                                if decision_scores.shape[1] != len(OEB_DESCRIPTIONS):
+                                    st.error(f"2D decision scores shape ({decision_scores.shape}) mismatch with OEB classes ({len(OEB_DESCRIPTIONS)}). Cannot compute probabilities reliably.")
                                     probs = np.full(len(OEB_DESCRIPTIONS), 1/len(OEB_DESCRIPTIONS) if len(OEB_DESCRIPTIONS) > 0 else 1.0)
-                                    common_len = min(len(probs), len(correct_len_probs))
-                                    correct_len_probs[:common_len] = probs[:common_len]
-                                    probs = correct_len_probs / np.sum(correct_len_probs) # Re-normalize
+                                else:
+                                    probs = softmax(decision_scores, axis=1)[0]
                             else:
-                                probs = softmax(decision_scores_2d, axis=1)[0]             
-                        elif decision_scores.ndim == 2: # Expected case: (n_samples, n_classes), e.g. (1, 7)
-                            if decision_scores.shape[1] != len(OEB_DESCRIPTIONS):
-                                st.error(f"2D decision scores shape ({decision_scores.shape}) mismatch with OEB classes ({len(OEB_DESCRIPTIONS)}). Cannot compute probabilities reliably.")
+                                st.error(f"Decision scores dimensionality ({decision_scores.ndim}) not supported. Expected 1D or 2D.")
                                 probs = np.full(len(OEB_DESCRIPTIONS), 1/len(OEB_DESCRIPTIONS) if len(OEB_DESCRIPTIONS) > 0 else 1.0)
-                            else:
-                                probs = softmax(decision_scores, axis=1)[0]
-                        
-                        else: 
-                            st.error(f"Decision scores have an unexpected shape: {decision_scores.shape}. Cannot reliably compute probabilities.")
+                                common_len = min(len(probs), len(correct_len_probs))
+                                correct_len_probs[:common_len] = probs[:common_len]
+                                probs = correct_len_probs / np.sum(correct_len_probs) # Re-normalize
+                        else:
+                            probs = softmax(decision_scores_2d, axis=1)[0]             
+                    elif decision_scores.ndim == 2: # Expected case: (n_samples, n_classes), e.g. (1, 7)
+                        if decision_scores.shape[1] != len(OEB_DESCRIPTIONS):
+                            st.error(f"2D decision scores shape ({decision_scores.shape}) mismatch with OEB classes ({len(OEB_DESCRIPTIONS)}). Cannot compute probabilities reliably.")
                             probs = np.full(len(OEB_DESCRIPTIONS), 1/len(OEB_DESCRIPTIONS) if len(OEB_DESCRIPTIONS) > 0 else 1.0)
+                        else:
+                            probs = softmax(decision_scores, axis=1)[0]
+                        
+                    else: 
+                        st.error(f"Decision scores have an unexpected shape: {decision_scores.shape}. Cannot reliably compute probabilities.")
+                        probs = np.full(len(OEB_DESCRIPTIONS), 1/len(OEB_DESCRIPTIONS) if len(OEB_DESCRIPTIONS) > 0 else 1.0)
 
                     pred_class = int(np.argmax(probs))
 
