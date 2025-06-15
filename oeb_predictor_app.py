@@ -15,12 +15,10 @@ import matplotlib.pyplot as plt
 from urllib.parse import quote
 import requests
 from rdkit import Chem, DataStructs
-from rdkit.Chem import Descriptors, AllChem, Draw
+from rdkit.Chem import Descriptors, AllChem
 from tensorflow.keras.models import load_model
 from rdkit.ML.Descriptors.MoleculeDescriptors import MolecularDescriptorCalculator
 from scipy.special import softmax
-from PIL import Image
-import io
 import os
 import tensorflow as tf
 
@@ -146,19 +144,6 @@ def get_pubchem_data(compound_name):
         st.warning(f"Error processing PubChem data for '{compound_name}': {e}")
     return None, None
 
-def smiles_to_image(smiles, mol_size=(300, 300)):
-    """Converts SMILES to a PIL Image of the molecule."""
-    if not smiles:
-        return None
-    mol = Chem.MolFromSmiles(smiles)
-    if mol is None:
-        return None
-    try:
-        return Draw.MolToImage(mol, size=mol_size)
-    except Exception as e:
-        st.error(f"Could not generate molecule image: {e}")
-        return None
-
 def normalize_probabilities(probs, target_length):
     """Normalizes probabilities to match target length."""
     if len(probs) == target_length:
@@ -279,14 +264,11 @@ def main():
                                   use_container_width=True)
 
     with vis_col:
-        st.subheader("👁️ Molecule Viewer")
+        st.subheader("👁️ SMILES Viewer")
         current_smiles_for_vis = st.session_state.get('smiles_input', DEFAULT_SMILES)
         if current_smiles_for_vis:
-            mol_image = smiles_to_image(current_smiles_for_vis)
-            if mol_image:
-                st.image(mol_image, caption=f"Structure for: {current_smiles_for_vis}", use_column_width=True)
-            else:
-                st.warning("Could not display molecule. SMILES might be invalid.")
+            st.code(current_smiles_for_vis)
+            st.info("Molecule visualization is currently disabled. The SMILES string is valid for prediction purposes.")
         else:
             st.info("Enter a SMILES string or search PubChem to see the molecule structure.")
 
