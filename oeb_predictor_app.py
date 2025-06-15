@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Created on Mon Jun  2 14:51:14 2025
 Updated by AI on Mon Jun 2 15:00:00 2025
@@ -325,7 +324,7 @@ def main():
                         
                         else: 
                             st.error(f"Decision scores dimensionality ({decision_scores.ndim}) not supported. Expected 1D or 2D.")
-                            probs = np.full(len(OEB_DESCRIPTIONS), 1/len(OEB_DESCRIPTIONS) if len(OEB_DESCRIPTIONS) > 0 else 1.0)t_len_probs = np.full(len(OEB_DESCRIPTIONS), 1/len(OEB_DESCRIPTIONS) if len(OEB_DESCRIPTIONS) > 0 else 1.0)
+                            probs = np.full(len(OEB_DESCRIPTIONS), 1/len(OEB_DESCRIPTIONS) if len(OEB_DESCRIPTIONS) > 0 else 1.0)
                                          common_len = min(len(probs), len(correct_len_probs))
                                          correct_len_probs[:common_len] = probs[:common_len]
                                          probs = correct_len_probs / np.sum(correct_len_probs) # Re-normalize
