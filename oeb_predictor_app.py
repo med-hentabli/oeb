@@ -328,56 +328,56 @@ def main():
                                 probs = correct_len_probs / np.sum(correct_len_probs) # Re-normalize
                         else:
                             probs = softmax(decision_scores_2d, axis=1)[0]             
-                    elif decision_scores.ndim == 2: # Expected case: (n_samples, n_classes), e.g. (1, 7)
-                        if decision_scores.shape[1] != len(OEB_DESCRIPTIONS):
-                            st.error(f"2D decision scores shape ({decision_scores.shape}) mismatch with OEB classes ({len(OEB_DESCRIPTIONS)}). Cannot compute probabilities reliably.")
-                            probs = np.full(len(OEB_DESCRIPTIONS), 1/len(OEB_DESCRIPTIONS) if len(OEB_DESCRIPTIONS) > 0 else 1.0)
-                        else:
-                            probs = softmax(decision_scores, axis=1)[0]
+        elif decision_scores.ndim == 2: # Expected case: (n_samples, n_classes), e.g. (1, 7)
+            if decision_scores.shape[1] != len(OEB_DESCRIPTIONS):
+                st.error(f"2D decision scores shape ({decision_scores.shape}) mismatch with OEB classes ({len(OEB_DESCRIPTIONS)}). Cannot compute probabilities reliably.")
+                probs = np.full(len(OEB_DESCRIPTIONS), 1/len(OEB_DESCRIPTIONS) if len(OEB_DESCRIPTIONS) > 0 else 1.0)
+            else:
+                probs = softmax(decision_scores, axis=1)[0]
                         
-                    else: 
-                        st.error(f"Decision scores have an unexpected shape: {decision_scores.shape}. Cannot reliably compute probabilities.")
-                        probs = np.full(len(OEB_DESCRIPTIONS), 1/len(OEB_DESCRIPTIONS) if len(OEB_DESCRIPTIONS) > 0 else 1.0)
+        else: 
+            st.error(f"Decision scores have an unexpected shape: {decision_scores.shape}. Cannot reliably compute probabilities.")
+            probs = np.full(len(OEB_DESCRIPTIONS), 1/len(OEB_DESCRIPTIONS) if len(OEB_DESCRIPTIONS) > 0 else 1.0)
 
-                    pred_class = int(np.argmax(probs))
+            pred_class = int(np.argmax(probs))
 
-                    st.success(f"🎉 Predicted OEB Class: **{pred_class}**")
-                    st.markdown(f"#### {OEB_DESCRIPTIONS.get(pred_class, 'Unknown OEB Class')}")
-                    st.markdown("---")
+            st.success(f"🎉 Predicted OEB Class: **{pred_class}**")
+            st.markdown(f"#### {OEB_DESCRIPTIONS.get(pred_class, 'Unknown OEB Class')}")
+            st.markdown("---")
 
-                    st.subheader("📊 Probability Distribution")
-                    # Ensure probs has the correct length for OEB_DESCRIPTIONS keys
-                    if len(probs) != len(OEB_DESCRIPTIONS):
-                        st.error(f"Probability array length ({len(probs)}) does not match OEB classes ({len(OEB_DESCRIPTIONS)}). Displaying raw probabilities if possible, but this indicates an issue.")
-                        # Try to display what we have, or an error message
-                        prob_df_data = {"OEB Class": list(range(len(probs))), "Probability": probs}
-                        if len(probs) > len(OEB_DESCRIPTIONS): # Truncate probs
-                            prob_df_data = {"OEB Class": list(OEB_DESCRIPTIONS.keys()), 
+            st.subheader("📊 Probability Distribution")
+            # Ensure probs has the correct length for OEB_DESCRIPTIONS keys
+            if len(probs) != len(OEB_DESCRIPTIONS):
+                st.error(f"Probability array length ({len(probs)}) does not match OEB classes ({len(OEB_DESCRIPTIONS)}). Displaying raw probabilities if possible, but this indicates an issue.")
+                # Try to display what we have, or an error message
+                prob_df_data = {"OEB Class": list(range(len(probs))), "Probability": probs}
+                if len(probs) > len(OEB_DESCRIPTIONS): # Truncate probs
+                    prob_df_data = {"OEB Class": list(OEB_DESCRIPTIONS.keys()), 
                                             "Description": [val.split(':')[1].split('(')[0].strip() for val in OEB_DESCRIPTIONS.values()],
                                             "Probability": probs[:len(OEB_DESCRIPTIONS)]}
-                            prob_df_data["Probability"] = prob_df_data["Probability"] / np.sum(prob_df_data["Probability"]) # Normalize
-                        elif len(probs) < len(OEB_DESCRIPTIONS): # Pad probs
-                            padded_probs = np.zeros(len(OEB_DESCRIPTIONS))
-                            padded_probs[:len(probs)] = probs
-                            if np.sum(padded_probs) > 0 : padded_probs = padded_probs / np.sum(padded_probs)
-                            else: padded_probs = np.full(len(OEB_DESCRIPTIONS), 1/len(OEB_DESCRIPTIONS) if len(OEB_DESCRIPTIONS) > 0 else 1.0)
-                            prob_df_data = {"OEB Class": list(OEB_DESCRIPTIONS.keys()), 
+                    prob_df_data["Probability"] = prob_df_data["Probability"] / np.sum(prob_df_data["Probability"]) # Normalize
+                elif len(probs) < len(OEB_DESCRIPTIONS): # Pad probs
+                    padded_probs = np.zeros(len(OEB_DESCRIPTIONS))
+                    padded_probs[:len(probs)] = probs
+                    if np.sum(padded_probs) > 0 : padded_probs = padded_probs / np.sum(padded_probs)
+                    else: padded_probs = np.full(len(OEB_DESCRIPTIONS), 1/len(OEB_DESCRIPTIONS) if len(OEB_DESCRIPTIONS) > 0 else 1.0)
+                        prob_df_data = {"OEB Class": list(OEB_DESCRIPTIONS.keys()), 
                                             "Description": [val.split(':')[1].split('(')[0].strip() for val in OEB_DESCRIPTIONS.values()],
                                             "Probability": padded_probs}
-                        else: # Should not happen if previous check failed, but as a safe guard
-                             prob_df_data = {"OEB Class": list(OEB_DESCRIPTIONS.keys()), 
+                else: # Should not happen if previous check failed, but as a safe guard
+                    prob_df_data = {"OEB Class": list(OEB_DESCRIPTIONS.keys()), 
                                             "Description": [val.split(':')[1].split('(')[0].strip() for val in OEB_DESCRIPTIONS.values()],
                                             "Probability": probs}
 
-                    else: # Lengths match
-                        prob_df_data = {
+            else: # Lengths match
+                prob_df_data = {
                             "OEB Class": list(OEB_DESCRIPTIONS.keys()),
                             "Description": [val.split(':')[1].split('(')[0].strip() for val in OEB_DESCRIPTIONS.values()],
                             "Probability": probs
                         }
                     
-                    prob_df = pd.DataFrame(prob_df_data).set_index("OEB Class")
-                    st.dataframe(prob_df.style.format({"Probability": "{:.2%}"}).bar(subset=["Probability"], color='lightgreen', vmin=0, vmax=1), use_container_width=True)
+                prob_df = pd.DataFrame(prob_df_data).set_index("OEB Class")
+                st.dataframe(prob_df.style.format({"Probability": "{:.2%}"}).bar(subset=["Probability"], color='lightgreen', vmin=0, vmax=1), use_container_width=True)
 
     with vis_col:
         st.subheader("👁️ Molecule Viewer")
